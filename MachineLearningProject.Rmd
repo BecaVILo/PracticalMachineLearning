@@ -1,0 +1,107 @@
+---
+title: "Machine Learning on Human Activity Recognition data set"
+output: 
+  html_document:
+    keep_md: true
+---
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+An overall pseudo-random number generator seed was set at 27 for all code.
+
+The outcome variable is *classe*, a factor variable with 5 levels. The dataset with 5 classes (sitting-down, standing-up, standing, walking, and sitting) collected on 8 hours of activities of 4 healthy subjects. For this data set, “participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different fashions:
+
+- exactly according to the specification (Class A)
+- throwing the elbows to the front (Class B)
+- lifting the dumbbell only halfway (Class C)
+- lowering the dumbbell only halfway (Class D)
+- throwing the hips to the front (Class E)
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience.
+
+Read more: http:/groupware.les.inf.puc-rio.br/har#ixzz4TjqneCKa
+
+In this project, we will adjust two different models, decision tree and random forest.The model with the highest accuracy will be chosen as our final model.
+
+**Cross validation**
+We will subset the training data into 2 subsamples, taking 75% of the original training data and 25% for the testing data. When the final model is choosen, it will be tested on the original Testing data set.
+
+### Working with the data
+Loading the data we need
+```{r warning=FALSE,message=FALSE}
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+set.seed(27)
+trainingUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+```{r cache=TRUE}
+trainingData <- read.csv(url(trainingUrl), na.strings=c("NA","#DIV/0!",""))
+testingData <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+```
+
+Deleting columns with missing values and the columns that we don't need
+```{r}
+trainingData<-trainingData[,colSums(is.na(trainingData)) == 0]
+testingData <-testingData[,colSums(is.na(testingData)) == 0]
+
+trainingData   <-trainingData[,-c(1:7)]
+testingData <-testingData[,-c(1:7)]
+```
+
+We create a data partition, the percentage of data that goes to trainig is 75%, we created 2 data set that contains only a susbset of the *trainingData* dataset, one for trainig and the other one for testing the results.
+```{r}
+trainSet <- createDataPartition(y=trainingData$classe, p=0.75, list=FALSE)
+
+training <- trainingData[trainSet, ] 
+test <- trainingData[-trainSet, ]
+```
+
+Notice that classe variable is factor with 5 levels.
+```{r}
+class(training$classe)
+```
+To have a better idea we plot this information
+```{r}
+library(ggplot2)
+qplot(training$classe, fill="red", main = "Levels of classe variable")
+```
+
+#### First model
+We fit a decision tree algorithm and plot the result.
+```{r}
+mod1 <-rpart(classe ~ ., data=training, method="class")
+rpart.plot(mod1, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+We test the model on the test data set
+```{r}
+prediction1 <- predict(mod1, test, type = "class")
+confusionMatrix(prediction1, test$classe)
+```
+
+
+#### Second model
+We fit a random forest algorithm.
+```{r}
+mod2 <- randomForest(classe ~. , data=training, method="class")
+prediction2 <- predict(mod2, test, type = "class")
+
+confusionMatrix(prediction2, test$classe)
+```
+
+Random Forest algorithm performed better than Decision Trees. Accuracy for Decision Tree model is 0.7335 and accuracy for Random Forest model is 0.9927, then we choose the Random Forest model. The expected out-of-sample error is estimated at 0.0073.
+
+#### Final outcome
+Using the choosen model on the original testing data set
+```{r}
+predictfinal <- predict(mod2, testingData, type="class")
+predictfinal
+```
+
